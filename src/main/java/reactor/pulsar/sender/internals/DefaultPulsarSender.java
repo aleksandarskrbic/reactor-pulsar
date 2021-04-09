@@ -3,6 +3,8 @@ package reactor.pulsar.sender.internals;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
@@ -19,6 +21,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class DefaultPulsarSender<M> implements PulsarSender<M>, EmitFailureHandler {
+
+    static final Logger log = LoggerFactory.getLogger(DefaultPulsarSender.class.getName());
 
     private final Scheduler scheduler;
     private final AtomicBoolean hasProducer;
@@ -46,33 +50,43 @@ public class DefaultPulsarSender<M> implements PulsarSender<M>, EmitFailureHandl
         });
     }
 
+    @Override
     public Flux<MessageId> send(Publisher<? extends PulsarRecord<M>> records) {
-        return producerMono.flatMapMany(producer -> {
-            return Flux.from(records).publishOn(scheduler).flatMap(record -> {
-                return Mono.fromCompletionStage(() -> {
-                    return producer.newMessage()
-                            .key(record.getKey())
-                            .value(record.getValue())
-                            .sendAsync();
-                });
-            });
-        });
+        return producerMono
+                .flatMapMany(producer -> {
+                    return Flux.from(records).publishOn(scheduler).flatMap(record -> {
+                        return Mono.fromCompletionStage(() -> {
+                            return producer.newMessage()
+                                    .key(record.getKey())
+                                    .value(record.getValue())
+                                    .sendAsync();
+                        });
+                    });
+                })
+                .doOnError(error -> log.trace("Send failed with exception", error));
     }
 
     @Override
     public void close() {
         producerMono
-                .flatMap(producer -> {
-                    return Mono.fromCompletionStage(producer::closeAsync).flatMap(__ -> {
-                        hasProducer.set(false);
-                        return Mono.empty();
-                    });
-                })
-                .block();
+                .flatMap(producer ->
+                        flush(producer).flatMap(__ -> close(producer))) // Mono.zip(flush(producer), close(producer)) ?
+                .subscribe(); // block() or subscribe() ?
     }
 
     @Override
     public boolean onEmitFailure(SignalType signalType, Sinks.EmitResult emitResult) {
         return hasProducer.get();
+    }
+
+    private Mono<Void> flush(Producer<M> producer) {
+        return Mono.fromCompletionStage(() -> producer.flushAsync());
+    }
+
+    private Mono<Void> close(Producer<M> producer) {
+        return Mono.fromCompletionStage(producer::closeAsync).flatMap(__ -> {
+            hasProducer.set(false);
+            return Mono.empty();
+        });
     }
 }
