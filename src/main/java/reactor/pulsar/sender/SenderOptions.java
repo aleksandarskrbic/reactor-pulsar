@@ -7,12 +7,13 @@ import java.util.Map;
 
 public interface SenderOptions<M> {
 
-    @NonNull
-    static <M> SenderOptions<M> create(@NonNull Map<String, Object> properties, @NonNull Schema<M> schema) {
-        return new ImmutableSenderOptions<>(properties, schema);
-    }
+  @NonNull
+  static <M> SenderOptions<M> create(
+      @NonNull Map<String, Object> properties, @NonNull Schema<M> schema) {
+    return new ImmutableSenderOptions<>(properties, schema);
+  }
 
-    Map<String, Object> properties();
+  Map<String, Object> properties();
 
-    Schema<M> schema();
+  Schema<M> schema();
 }

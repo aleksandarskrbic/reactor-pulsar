@@ -6,10 +6,10 @@ import java.util.Map;
 
 public interface ClientOptions {
 
-    @NonNull
-    static ClientOptions create(@NonNull Map<String, Object> properties) {
-        return new ImmutableClientOptions(properties);
-    }
+  @NonNull
+  static ClientOptions create(@NonNull Map<String, Object> properties) {
+    return new ImmutableClientOptions(properties);
+  }
 
-    Map<String, Object> properties();
+  Map<String, Object> properties();
 }
