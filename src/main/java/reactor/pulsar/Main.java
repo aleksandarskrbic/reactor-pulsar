@@ -2,14 +2,15 @@ package reactor.pulsar;
 
 import org.apache.pulsar.client.api.*;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import reactor.pulsar.client.ClientOptions;
 import reactor.pulsar.client.ReactorPulsarClient;
+import reactor.pulsar.receiver.PulsarReceiver;
+import reactor.pulsar.receiver.ReceiverOptions;
 import reactor.pulsar.sender.PulsarRecord;
 import reactor.pulsar.sender.PulsarSender;
 import reactor.pulsar.sender.SenderOptions;
-import reactor.tools.agent.ReactorDebugAgent;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,7 +21,7 @@ public class Main {
     ClientOptions clientOptions = ClientOptions.create(options);
     ReactorPulsarClient client = ReactorPulsarClient.create(clientOptions);
     SenderOptions<String> senderOptions =
-        SenderOptions.create(Map.of("topicName", "topic5"), Schema.STRING);
+        SenderOptions.create(Map.of("topicName", "topic10"), Schema.STRING);
     PulsarSender<String> sender = PulsarSender.create(client, senderOptions);
 
     Flux<PulsarRecord<String>> recordFlux =
@@ -30,26 +31,18 @@ public class Main {
             PulsarRecord.create("Key3", "Value3"));
 
     Flux<MessageId> sent = sender.send(recordFlux);
-    sent.subscribe(messageId -> System.out.println("Poruka " + messageId + " je poslata"));
+    sent.subscribe(messageId -> System.out.println("Sent: " + messageId));
 
     System.out.println(5000);
 
-    final HashMap<String, Object> map = new HashMap<>();
-    map.put("serviceUrl", "pulsar://localhost:6650");
-    final PulsarClient pc = PulsarClient.builder().loadConf(map).build();
-    Consumer<String> consumer =
-        pc.newConsumer(Schema.STRING)
-            .topic("topic5")
-            .consumerName("consumer-5")
-            .subscriptionName("consumer-5")
-            .subscribe();
+    ReceiverOptions<String> opts =
+        ReceiverOptions.create(Map.of("serviceUrl", "pulsar://localhost:6650"), Schema.STRING)
+            .withSubscription(Collections.singleton("topic10"))
+            .withSubscriptionName("consumer-10");
 
-    int consumed = 0;
-    while (consumed < 2) {
-      System.out.println("Fetch iteration " + consumed);
-      Message<String> receive = consumer.receive();
-      consumed++;
-      System.out.println(consumed + " primljena " + receive.getValue());
-    }
+    PulsarReceiver<String> pulsarReceiver = PulsarReceiver.create(client, opts);
+    pulsarReceiver.receive().subscribe(a -> System.out.println("Received: " + a.getValue()));
+
+    Thread.sleep(10000);
   }
 }
