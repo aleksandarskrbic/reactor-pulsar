@@ -1,7 +1,7 @@
 package reactor.pulsar.receiver.internals;
 
 import org.apache.pulsar.client.api.Consumer;
-import org.apache.pulsar.client.api.Messages;
+import org.apache.pulsar.client.api.Message;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -13,18 +13,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ConsumerHandler<M> {
 
-  private Consumer<M> consumer;
-  private final Sinks.Many<Messages<M>> sink = Sinks.many().unicast().onBackpressureBuffer();
+  private final Consumer<M> consumer;
+  private final Sinks.Many<ReceiverRecord<M>> sink = Sinks.many().unicast().onBackpressureBuffer();
   private final AtomicBoolean shouldRun = new AtomicBoolean(true);
   private final Future<?> eventLoop;
   // private Function<> decider ??? message acknowledger???
 
   public ConsumerHandler(Consumer<M> consumer) {
     this.consumer = consumer;
+    // Use Scheduler.schedule() instead of ExecutorService ???
     this.eventLoop = Executors.newSingleThreadExecutor().submit(this::consumerLoop);
   }
 
-  public Flux<Messages<M>> receive() {
+  public Flux<ReceiverRecord<M>> receive() {
     return sink.asFlux();
   }
 
@@ -40,9 +41,10 @@ public class ConsumerHandler<M> {
   private void consumerLoop() {
     while (true) {
       if (shouldRun.get()) {
-        // receive vs batchReceive?
-        CompletableFuture<Messages<M>> future = consumer.batchReceiveAsync();
-        future.whenComplete((messages, error) -> sink.tryEmitNext(messages));
+        // receive vs batchReceive? introduce enum consumer_mode, micro-batch vs. streaming
+        CompletableFuture<Message<M>> future = consumer.receiveAsync();
+        future.whenComplete(
+            (message, error) -> sink.tryEmitNext(ReceiverRecord.create(consumer, message)));
       }
     }
   }

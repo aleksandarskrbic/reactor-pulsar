@@ -2,6 +2,7 @@ package reactor.pulsar.receiver.internals;
 
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -13,7 +14,6 @@ import reactor.pulsar.receiver.PulsarReceiver;
 import reactor.pulsar.receiver.ReceiverOptions;
 
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 public class DefaultPulsarReceiver<M> implements PulsarReceiver<M> {
 
@@ -22,7 +22,7 @@ public class DefaultPulsarReceiver<M> implements PulsarReceiver<M> {
   private final ReactorPulsarClient reactorPulsarClient;
   private final ReceiverOptions<M> receiverOptions;
   private final Mono<Consumer<M>> consumerMono;
-  ConsumerHandler<M> consumerHandler;
+  private ConsumerHandler<M> consumerHandler;
 
   public DefaultPulsarReceiver(
       ReactorPulsarClient reactorPulsarClient, ReceiverOptions<M> receiverOptions) {
@@ -46,18 +46,12 @@ public class DefaultPulsarReceiver<M> implements PulsarReceiver<M> {
   }
 
   @Override
-  public Flux<Message<M>> receive() {
-    return withHandler(
-        ((scheduler, handler) ->
-            handler
-                .receive()
-                .filter(batch -> batch.size() != 0)
-                .publishOn(scheduler)
-                .flatMapIterable(Function.identity())));
+  public Flux<ReceiverRecord<M>> receive() {
+    return withHandler((scheduler, handler) -> handler.receive().publishOn(scheduler));
   }
 
-  private Flux<Message<M>> withHandler(
-      BiFunction<Scheduler, ConsumerHandler<M>, Flux<Message<M>>> fn) {
+  private Flux<ReceiverRecord<M>> withHandler(
+      BiFunction<Scheduler, ConsumerHandler<M>, Flux<ReceiverRecord<M>>> fn) {
     return Flux.usingWhen(
         consumerMono.flatMap(
             consumer -> Mono.fromCallable(() -> consumerHandler = new ConsumerHandler<>(consumer))),

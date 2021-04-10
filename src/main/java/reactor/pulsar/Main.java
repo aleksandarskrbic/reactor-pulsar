@@ -21,7 +21,7 @@ public class Main {
     ClientOptions clientOptions = ClientOptions.create(options);
     ReactorPulsarClient client = ReactorPulsarClient.create(clientOptions);
     SenderOptions<String> senderOptions =
-        SenderOptions.create(Map.of("topicName", "topic10"), Schema.STRING);
+        SenderOptions.create(Map.of("topicName", "topic11"), Schema.STRING);
     PulsarSender<String> sender = PulsarSender.create(client, senderOptions);
 
     Flux<PulsarRecord<String>> recordFlux =
@@ -37,12 +37,15 @@ public class Main {
 
     ReceiverOptions<String> opts =
         ReceiverOptions.create(Map.of("serviceUrl", "pulsar://localhost:6650"), Schema.STRING)
-            .withSubscription(Collections.singleton("topic10"))
-            .withSubscriptionName("consumer-10");
+            .withSubscription(Collections.singleton("topic11"))
+            .withSubscriptionName("consumer-11");
 
     PulsarReceiver<String> pulsarReceiver = PulsarReceiver.create(client, opts);
-    pulsarReceiver.receive().subscribe(a -> System.out.println("Received: " + a.getValue()));
+    pulsarReceiver
+        .receive()
+        .map(record -> record.negativeAcknowledge())
+        .subscribe(a -> System.out.println("Received: " + a.message().getValue()));
 
-    Thread.sleep(10000);
+    Thread.sleep(60000);
   }
 }
