@@ -13,7 +13,7 @@ public interface PulsarSender<M> {
     return new DefaultPulsarSender<>(reactorPulsarClient, senderOptions);
   }
 
-  Flux<MessageId> send(Publisher<? extends PulsarRecord<M>> records);
+  Flux<MessageId> send(Publisher<? extends SenderMessage<M>> records);
 
   void close();
 }

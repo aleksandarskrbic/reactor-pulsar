@@ -13,7 +13,7 @@ import reactor.core.publisher.Sinks.EmitFailureHandler;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.pulsar.client.ReactorPulsarClient;
-import reactor.pulsar.sender.PulsarRecord;
+import reactor.pulsar.sender.SenderMessage;
 import reactor.pulsar.sender.PulsarSender;
 import reactor.pulsar.sender.SenderOptions;
 
@@ -59,7 +59,7 @@ public class DefaultPulsarSender<M> implements PulsarSender<M>, EmitFailureHandl
   }
 
   @Override
-  public Flux<MessageId> send(Publisher<? extends PulsarRecord<M>> records) {
+  public Flux<MessageId> send(Publisher<? extends SenderMessage<M>> records) {
     return producerMono
         .flatMapMany(
             producer -> {

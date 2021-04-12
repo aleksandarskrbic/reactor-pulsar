@@ -1,7 +1,6 @@
 package reactor.pulsar.receiver.internals;
 
 import org.apache.pulsar.client.api.Consumer;
-import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +10,7 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.pulsar.client.ReactorPulsarClient;
 import reactor.pulsar.receiver.PulsarReceiver;
+import reactor.pulsar.receiver.ReceiverMessage;
 import reactor.pulsar.receiver.ReceiverOptions;
 
 import java.util.function.BiFunction;
@@ -45,13 +45,32 @@ public class DefaultPulsarReceiver<M> implements PulsarReceiver<M> {
                 });
   }
 
+  public Consumer<M> get() {
+    return consumerMono.block();
+  }
+
   @Override
-  public Flux<ReceiverRecord<M>> receive() {
+  public Flux<ReceiverMessage<M>> receive() {
     return withHandler((scheduler, handler) -> handler.receive().publishOn(scheduler));
   }
 
-  private Flux<ReceiverRecord<M>> withHandler(
-      BiFunction<Scheduler, ConsumerHandler<M>, Flux<ReceiverRecord<M>>> fn) {
+  @Override
+  public void ack(MessageId messageId) {
+    consumerMono
+        .flatMap(consumer -> Mono.fromCompletionStage(() -> consumer.acknowledgeAsync(messageId)))
+        .then()
+        .subscribe();
+  }
+
+  @Override
+  public void nack(MessageId messageId) {
+    consumerMono
+        .flatMap(consumer -> Mono.fromRunnable(() -> consumer.negativeAcknowledge(messageId)))
+        .subscribe();
+  }
+
+  private Flux<ReceiverMessage<M>> withHandler(
+      BiFunction<Scheduler, ConsumerHandler<M>, Flux<ReceiverMessage<M>>> fn) {
     return Flux.usingWhen(
         consumerMono.flatMap(
             consumer -> Mono.fromCallable(() -> consumerHandler = new ConsumerHandler<>(consumer))),

@@ -1,15 +1,15 @@
 package reactor.pulsar.sender;
 
-public class PulsarRecord<V> {
+public class SenderMessage<V> {
 
   private String key;
   private V value;
 
-  public static <V> PulsarRecord<V> create(String key, V value) {
-    return new PulsarRecord<>(key, value);
+  public static <V> SenderMessage<V> create(String key, V value) {
+    return new SenderMessage<>(key, value);
   }
 
-  private PulsarRecord(String key, V value) {
+  private SenderMessage(String key, V value) {
     this.key = key;
     this.value = value;
   }
